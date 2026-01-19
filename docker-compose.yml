@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  github-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: github-runner
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - GITHUB_OWNER=${GITHUB_OWNER}
+      - GITHUB_REPOSITORY=${GITHUB_REPOSITORY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - RUNNER_NAME=${RUNNER_NAME:-proxmox-runner}
+      - RUNNER_WORKDIR=${RUNNER_WORKDIR:-/home/runner/_work}
+      - RUNNER_LABELS=${RUNNER_LABELS:-self-hosted,proxmox,docker}
+      - RUNNER_GROUP=${RUNNER_GROUP:-Default}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner-data:/home/runner/_work
+    networks:
+      - runner-network
+
+volumes:
+  runner-data:
+    driver: local
+
+networks:
+  runner-network:
+    driver: bridge

@@ -1,0 +1,29 @@
+# Environment files
+.env
+*.env
+!.env.example
+
+# Runner data
+_work/
+_diag/
+
+# Docker volumes
+volumes/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.bak
