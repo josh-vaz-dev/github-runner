@@ -1,48 +1,53 @@
 FROM ubuntu:22.04
 
-# Avoid prompts from apt
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install dependencies
+# Install base dependencies and Python
 RUN apt-get update && apt-get install -y \
     curl \
-    jq \
     git \
+    jq \
+    tar \
+    libicu70 \
+    liblttng-ust1 \
+    libssl3 \
+    zlib1g \
+    ca-certificates \
     sudo \
-    iputils-ping \
+    wget \
+    unzip \
     build-essential \
-    libssl-dev \
-    libffi-dev \
     python3 \
     python3-pip \
+    python3-venv \
+    python3-dev \
     apt-transport-https \
-    ca-certificates \
-    software-properties-common \
+    gnupg \
+    lsb-release \
+    openssh-client \
+    rsync \
+    sshpass \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Docker CLI (for workflows that need docker)
-RUN curl -fsSL https://get.docker.com -o get-docker.sh && \
-    sh get-docker.sh && \
-    rm get-docker.sh
+# Install Docker CLI only (will use host Docker daemon)
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable" > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && \
+    apt-get install -y docker-ce-cli docker-buildx-plugin docker-compose-plugin && \
+    rm -rf /var/lib/apt/lists/*
 
-# Create a user for the runner
+# Create runner user with sudo access
 RUN useradd -m -s /bin/bash runner && \
     usermod -aG sudo runner && \
     echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Set working directory
+# Download and install GitHub Actions runner
 WORKDIR /home/runner
-
-# Download and extract GitHub Actions runner
-ARG RUNNER_VERSION="2.311.0"
-RUN curl -o actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz -L \
-    https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz && \
-    tar xzf ./actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz && \
-    rm actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz && \
+RUN RUNNER_VERSION=$(curl -s https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name' | sed 's/v//') && \
+    curl -o actions-runner-linux-x64.tar.gz -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz && \
+    tar xzf actions-runner-linux-x64.tar.gz && \
+    rm actions-runner-linux-x64.tar.gz && \
     chown -R runner:runner /home/runner
-
-# Install runner dependencies
-RUN ./bin/installdependencies.sh
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh

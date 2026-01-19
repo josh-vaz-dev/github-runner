@@ -1,6 +1,6 @@
-# GitHub Actions Self-Hosted Runner for Proxmox
+# GitHub Actions Self-Hosted Runner
 
-A Dockerized GitHub Actions self-hosted runner designed for deployment on Proxmox Virtual Environment (PVE). This setup allows you to run GitHub Actions workflows on your own infrastructure.
+A Dockerized GitHub Actions self-hosted runner that can be deployed on Windows (Docker Desktop/WSL2), Linux, or Proxmox Virtual Environment. Run GitHub Actions workflows on your own infrastructure with ease.
 
 ## Features
 
@@ -11,19 +11,20 @@ A Dockerized GitHub Actions self-hosted runner designed for deployment on Proxmo
 - ♻️ Auto-restart on failure
 - 🔧 Easy configuration via environment variables
 - 🏢 Supports both organization and repository runners
+- 💻 Works on Windows, Linux, macOS, and Proxmox
 
 ## Prerequisites
 
-### On Your Local Machine
+### General Requirements
 - Git
+- Docker and Docker Compose
 - GitHub account with appropriate permissions
-
-### On Proxmox Server
-- Proxmox VE 7.0 or higher
-- A Linux VM or LXC container (Ubuntu 22.04 LTS recommended)
-- Docker and Docker Compose installed
 - Minimum 2GB RAM and 20GB disk space
-- Internet connectivity
+
+### Platform-Specific
+- **Windows**: Docker Desktop for Windows OR WSL2 with Docker
+- **Linux/macOS**: Docker and Docker Compose installed
+- **Proxmox**: VM or LXC container with Docker installed
 
 ## Quick Start
 
@@ -31,15 +32,140 @@ A Dockerized GitHub Actions self-hosted runner designed for deployment on Proxmo
 
 1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
 2. Click "Generate new token (classic)"
-3. Give it a descriptive name (e.g., "Proxmox Runner")
+3. Give it a descriptive name (e.g., "Self-Hosted Runner")
 4. Select scopes:
    - For **repository runners**: `repo` (Full control of private repositories)
    - For **organization runners**: `admin:org` (Full control of orgs and teams)
 5. Click "Generate token" and copy it immediately (you won't see it again)
 
-### 2. Set Up on Proxmox
+### 2. Choose Your Deployment Platform
 
-#### Option A: Using Ubuntu VM
+## 🪟 Windows - Docker Desktop (Easiest!)
+
+### Prerequisites
+- [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop) installed and running
+- Git for Windows
+
+### Setup Steps
+
+1. **Open PowerShell or Terminal**
+
+2. **Clone the repository**
+   ```powershell
+   git clone https://github.com/josh-vaz-dev/github-runner.git
+   cd github-runner
+   ```
+
+3. **Configure environment variables**
+   ```powershell
+   copy .env.example .env
+   notepad .env
+   ```
+   
+   Edit the `.env` file:
+   ```bash
+   # For repository runner:
+   GITHUB_OWNER=your-username
+   GITHUB_REPOSITORY=your-repo
+   GITHUB_TOKEN=ghp_your_token_here
+   RUNNER_NAME=windows-docker-runner
+   RUNNER_LABELS=self-hosted,windows-docker,local
+   
+   # For organization runner (leave GITHUB_REPOSITORY empty):
+   GITHUB_OWNER=your-org-name
+   GITHUB_REPOSITORY=
+   GITHUB_TOKEN=ghp_your_token_here
+   RUNNER_NAME=windows-docker-runner
+   ```
+
+4. **Start the runner**
+   ```powershell
+   docker-compose up -d
+   ```
+
+5. **Verify it's running**
+   ```powershell
+   docker-compose logs -f
+   # Look for "Listening for Jobs" message
+   ```
+
+6. **Check on GitHub**
+   - Go to your repository/organization Settings → Actions → Runners
+   - Your runner should appear as "Idle" and ready to accept jobs
+
+### Stopping the Runner
+```powershell
+docker-compose down
+```
+
+## 🐧 WSL2 on Windows (Recommended for Development)
+
+WSL2 provides a native Linux environment on Windows with excellent Docker integration.
+
+### Prerequisites
+- WSL2 enabled on Windows
+- Ubuntu (or another Linux distro) installed in WSL2
+- Docker Desktop with WSL2 backend enabled
+
+### Setup Steps
+
+1. **Open WSL2 terminal** (Ubuntu)
+
+2. **Ensure Docker is accessible**
+   ```bash
+   docker --version
+   # Should show Docker version without errors
+   ```
+
+3. **Clone the repository**
+   ```bash
+   git clone https://github.com/josh-vaz-dev/github-runner.git
+   cd github-runner
+   ```
+
+4. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   nano .env  # or use 'vim' or 'code .env'
+   ```
+   
+   Edit the `.env` file:
+   ```bash
+   GITHUB_OWNER=your-username
+   GITHUB_REPOSITORY=your-repo
+   GITHUB_TOKEN=ghp_your_token_here
+   RUNNER_NAME=wsl2-runner
+   RUNNER_LABELS=self-hosted,wsl2,linux,local
+   ```
+
+5. **Start the runner**
+   ```bash
+   docker-compose up -d
+   ```
+
+6. **Verify the runner**
+   ```bash
+   docker-compose logs -f
+   ```
+
+### Auto-Start on Windows Boot (Optional)
+
+Create a Windows Task or add to startup:
+```powershell
+# In PowerShell (as Administrator)
+wsl -d Ubuntu -e bash -c "cd ~/github-runner && docker-compose up -d"
+```
+
+## 🖥️ Proxmox Virtual Environment
+
+Perfect for homelab setups and production deployments.
+
+### Prerequisites on Proxmox
+- Proxmox VE 7.0 or higher
+- A Linux VM or LXC container (Ubuntu 22.04 LTS recommended)
+- Internet connectivity
+
+### Option A: Using Ubuntu VM
 
 1. **Create Ubuntu VM in Proxmox**
    ```bash
@@ -93,12 +219,14 @@ A Dockerized GitHub Actions self-hosted runner designed for deployment on Proxmo
    GITHUB_REPOSITORY=your-repo
    GITHUB_TOKEN=ghp_your_token_here
    RUNNER_NAME=proxmox-runner-1
+   RUNNER_LABELS=self-hosted,proxmox,linux
    
    # For organization runner (leave GITHUB_REPOSITORY empty):
    GITHUB_OWNER=your-org-name
    GITHUB_REPOSITORY=
    GITHUB_TOKEN=ghp_your_token_here
    RUNNER_NAME=proxmox-org-runner-1
+   RUNNER_LABELS=self-hosted,proxmox,linux
    ```
 
 6. **Start the runner**
@@ -266,6 +394,132 @@ jobs:
           docker --version
 ```
 
+## Multi-Host Deployments
+
+The runner includes SSH tools for deploying to multiple locations (local machine, Raspberry Pi, Proxmox, etc.).
+
+### Setup Deployment Targets
+
+**Option 1: Using GitHub Secrets (Recommended for sensitive data)**
+
+Add to your repository/organization Settings → Secrets and variables → Actions:
+- `PI5_HOST` = `192.168.1.100`
+- `PI5_USER` = `pi`
+- `PI5_SSH_KEY` = (your private SSH key content)
+- `PROXMOX_HOST` = `192.168.1.50`
+- `PROXMOX_USER` = `root`
+- `PROXMOX_SSH_KEY` = (your private SSH key content)
+
+**Option 2: Using .env file (for non-sensitive configuration)**
+
+Add to your `.env` file:
+```bash
+# Deployment targets
+PI5_HOST=192.168.1.100
+PI5_USER=pi
+PROXMOX_HOST=192.168.1.50
+PROXMOX_USER=root
+```
+
+Then mount an SSH key as a volume in `docker-compose.yml`:
+```yaml
+volumes:
+  - runner-data:/home/runner/_work
+  - /var/run/docker.sock:/var/run/docker.sock
+  - ~/.ssh/deploy_key:/home/runner/.ssh/deploy_key:ro
+```
+
+### Example Deployment Workflow
+
+```yaml
+name: Deploy to Multiple Hosts
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Build Docker image
+      - name: Build Image
+        run: docker build -t myapp:latest .
+      
+      # Deploy to local machine (Windows host)
+      - name: Deploy Locally
+        run: docker-compose -f docker-compose.prod.yml up -d
+      
+      # Deploy to Raspberry Pi 5
+      - name: Deploy to Pi5
+        env:
+          PI_HOST: ${{ secrets.PI5_HOST }}
+          PI_USER: ${{ secrets.PI5_USER }}
+          PI_KEY: ${{ secrets.PI5_SSH_KEY }}
+        run: |
+          echo "$PI_KEY" > /tmp/pi_key
+          chmod 600 /tmp/pi_key
+          
+          # Copy compose file
+          scp -i /tmp/pi_key -o StrictHostKeyChecking=no \
+            docker-compose.yml $PI_USER@$PI_HOST:/home/$PI_USER/app/
+          
+          # Deploy on Pi
+          ssh -i /tmp/pi_key -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
+            "cd /home/$PI_USER/app && docker-compose pull && docker-compose up -d"
+          
+          rm /tmp/pi_key
+      
+      # Deploy to Proxmox VM
+      - name: Deploy to Proxmox
+        env:
+          PROXMOX_HOST: ${{ secrets.PROXMOX_HOST }}
+          PROXMOX_USER: ${{ secrets.PROXMOX_USER }}
+          PROXMOX_KEY: ${{ secrets.PROXMOX_SSH_KEY }}
+        run: |
+          echo "$PROXMOX_KEY" > /tmp/proxmox_key
+          chmod 600 /tmp/proxmox_key
+          
+          ssh -i /tmp/proxmox_key -o StrictHostKeyChecking=no \
+            $PROXMOX_USER@$PROXMOX_HOST \
+            "docker pull myapp:latest && cd /opt/myapp && docker-compose up -d"
+          
+          rm /tmp/proxmox_key
+```
+
+### Using Docker Contexts (Advanced)
+
+For cleaner deployment commands, configure Docker contexts:
+
+```yaml
+- name: Setup Docker Contexts
+  run: |
+    docker context create pi5 --docker "host=ssh://${{ secrets.PI5_USER }}@${{ secrets.PI5_HOST }}"
+    docker context create proxmox --docker "host=ssh://${{ secrets.PROXMOX_USER }}@${{ secrets.PROXMOX_HOST }}"
+
+- name: Deploy to Pi5
+  run: docker --context pi5 compose up -d
+
+- name: Deploy to Proxmox
+  run: docker --context proxmox compose up -d
+```
+
+### SSH Key Setup
+
+Generate deployment SSH keys on each target:
+
+```bash
+# On your Pi5/Proxmox
+ssh-keygen -t ed25519 -C "github-runner-deploy" -f ~/.ssh/github_deploy
+cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
+
+# Copy the private key content
+cat ~/.ssh/github_deploy
+# Add this to GitHub Secrets as PI5_SSH_KEY
+```
+
 ## Troubleshooting
 
 ### Runner not appearing in GitHub
@@ -275,27 +529,52 @@ jobs:
 3. Ensure token hasn't expired
 4. Check network connectivity from the container
 
-### Permission denied errors
+### Windows/Docker Desktop Issues
 
+**Container won't start:**
+- Ensure Docker Desktop is running
+- Check that WSL2 backend is enabled (Settings → General → Use WSL2)
+- Verify virtualization is enabled in BIOS
+
+**Performance issues:**
+- Allocate more resources to Docker Desktop (Settings → Resources)
+- Recommended: 4GB RAM minimum, 2 CPU cores
+
+**File sharing errors:**
+- Enable file sharing for the drive where your code is located (Settings → Resources → File Sharing)
+
+### WSL2 Issues
+
+**Docker command not found:**
+```bash
+# Ensure Docker Desktop integration is enabled for your WSL2 distro
+# Docker Desktop → Settings → Resources → WSL Integration
+```
+
+**Slow performance:**
+- Store files in WSL2 filesystem (`~/`) not Windows filesystem (`/mnt/c/`)
+- Clone the repo directly in WSL2: `cd ~; git clone ...`
+
+### Linux/Proxmox Issues
+
+**Permission denied errors:**
 ```bash
 # Ensure user is in docker group
 sudo usermod -aG docker $USER
 # Logout and login again
 ```
 
-### LXC container issues
-
+**LXC container issues:**
 1. Verify nesting is enabled in container config
 2. Check AppArmor profile is set to unconfined
 3. Restart container after config changes
 
-### Docker socket errors
-
+**Docker socket errors:**
 ```bash
 # Check socket permissions
 ls -la /var/run/docker.sock
 
-# Fix if needed
+# Fix if needed (temporary)
 sudo chmod 666 /var/run/docker.sock
 ```
 
@@ -308,9 +587,19 @@ sudo chmod 666 /var/run/docker.sock
 - 👥 For organization runners, restrict to specific repositories
 - 🔍 Monitor runner activity regularly
 - 🚫 Be cautious with public repositories - consider using ephemeral runners
+- 💻 **Local development**: Runners on your PC can access your local files and network
+- 🏠 **Homelab/Proxmox**: Consider network segmentation for runners
 
-## Proxmox Best Practices
+## Platform-Specific Best Practices
 
+### Windows/WSL2
+- **Resource Allocation**: Configure Docker Desktop resources appropriately
+- **Storage**: Keep runner workspace on fast SSD
+- **Auto-start**: Create startup task if you want runner always available
+- **Updates**: Keep Docker Desktop and WSL2 updated
+- **Performance**: Use WSL2 filesystem for best performance
+
+### Proxmox Production
 1. **Resource Allocation**
    - Minimum: 2 CPU cores, 4GB RAM, 32GB disk
    - Recommended: 4 CPU cores, 8GB RAM, 50GB disk
