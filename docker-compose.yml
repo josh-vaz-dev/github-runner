@@ -1,10 +1,11 @@
 services:
   github-runner:
     build: .
-    container_name: github-runner
     restart: unless-stopped
     env_file:
       - .env
+    deploy:
+      replicas: 3 # Increase this number to deploy multiple runners
     environment:
       - GITHUB_OWNER=${GITHUB_OWNER}
       - GITHUB_REPOSITORY=${GITHUB_REPOSITORY}
@@ -15,8 +16,18 @@ services:
       - RUNNER_GROUP=${RUNNER_GROUP}
     volumes:
       - runner-data:/home/runner/_work
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:rw
     privileged: true
+    networks:
+      - lan_network
+    extra_hosts:
+      - "pi-net:192.168.1.2"
+
+networks:
+  lan_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: docker-lan
 
 volumes:
   runner-data:

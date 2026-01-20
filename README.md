@@ -400,7 +400,43 @@ The runner includes SSH tools for deploying to multiple locations (local machine
 
 ### Setup Deployment Targets
 
-**Option 1: Using GitHub Secrets (Recommended for sensitive data)**
+**Option 1: Using 1Password (Recommended)**
+
+The runner includes 1Password CLI for secure secret management.
+
+1. **Create a 1Password Service Account**
+   - Go to 1Password → Developer Tools → Service Accounts
+   - Create service account with read access to your deployment vault
+   - Copy the `OP_SERVICE_ACCOUNT_TOKEN`
+
+2. **Add service account token to GitHub**
+   - Repository/Organization Settings → Secrets → New secret
+   - Name: `OP_SERVICE_ACCOUNT_TOKEN`
+   - Value: Your service account token
+
+3. **Store secrets in 1Password**
+   - Create a vault: "GitHub Deployments"
+   - Add SSH Key items: `pi5-ssh-key`, `proxmox-ssh-key`
+   - Add config item: `deployment-config` with fields:
+     - PI5_HOST
+     - PI5_USER
+     - PROXMOX_HOST
+     - PROXMOX_USER
+
+4. **Use in workflows:**
+```yaml
+- name: Load secrets from 1Password
+  uses: 1password/load-secrets-action@v1
+  with:
+    export-env: true
+  env:
+    OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+    PI5_HOST: op://GitHub Deployments/deployment-config/PI5_HOST
+    PI5_USER: op://GitHub Deployments/deployment-config/PI5_USER
+    PI5_SSH_KEY: op://GitHub Deployments/pi5-ssh-key/private key
+```
+
+**Option 2: Using GitHub Secrets**
 
 Add to your repository/organization Settings → Secrets and variables → Actions:
 - `PI5_HOST` = `192.168.1.100`

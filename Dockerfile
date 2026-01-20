@@ -25,6 +25,9 @@ RUN apt-get update && apt-get install -y \
     openssh-client \
     rsync \
     sshpass \
+    iptables \
+    iputils-ping \
+    net-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Docker CLI only (will use host Docker daemon)
@@ -36,9 +39,24 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
     apt-get install -y docker-ce-cli docker-buildx-plugin docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/*
 
-# Create runner user with sudo access
+# Install 1Password CLI
+RUN curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
+    gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/amd64 stable main" | \
+    tee /etc/apt/sources.list.d/1password.list && \
+    mkdir -p /etc/debsig/policies/AC2D62742012EA22/ && \
+    curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol | \
+    tee /etc/debsig/policies/AC2D62742012EA22/1password.pol && \
+    mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 && \
+    curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
+    gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg && \
+    apt-get update && apt-get install -y 1password-cli && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create runner user with sudo and docker group access
 RUN useradd -m -s /bin/bash runner && \
-    usermod -aG sudo runner && \
+    groupadd -f docker && \
+    usermod -aG sudo,docker runner && \
     echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Download and install GitHub Actions runner
@@ -51,10 +69,7 @@ RUN RUNNER_VERSION=$(curl -s https://api.github.com/repos/actions/runner/release
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && \
-    chown runner:runner /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Switch to runner user
-USER runner
-
+# Start as root, entrypoint will switch to runner after setup
 ENTRYPOINT ["/entrypoint.sh"]
